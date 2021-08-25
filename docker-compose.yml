@@ -1,0 +1,78 @@
+version: '3.6'
+
+networks:
+  projectenv:
+
+services:
+  php:
+    build:
+      context: .
+      dockerfile: ./.docker/Dockerfile
+    working_dir: /app
+    container_name: php_app
+    volumes:
+      - ./src:/app
+    ports:
+      - "9000:9000"
+    environment:
+      DB_HOST: mysql
+    networks:
+      - projectenv
+
+  nginx:
+    image: nginx:1.17
+    container_name: nginx_${DB_DATABASE}
+    depends_on:
+      - php
+    ports:
+      - 8000:80
+      - 8001:443
+    volumes:
+      - ./src:/app
+      - ./.docker/.nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./.docker/.nginx/frontend-gzip.conf:/etc/nginx/conf.d/compression.conf
+    networks:
+      - projectenv
+
+  mysql:
+    image: mysql:5.7
+    container_name: mysql_${DB_DATABASE}
+    ports:
+      - ${DB_PORT}:3306
+    tty: true
+    depends_on:
+      - php
+    volumes:
+      - ./src:/app
+      - ./.docker/.mysql:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+    networks:
+      - projectenv
+
+  phpadmin:
+    image: phpmyadmin/phpmyadmin:5.0
+    container_name: phpadmin_${DB_DATABASE}
+    ports:
+      - 8080:80
+    depends_on:
+      - mysql
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: 
+    networks:
+      - projectenv
+
+  node:
+    image: node:12.16.1-alpine
+    container_name: node_${DB_DATABASE}
+    tty: true
+    depends_on:
+      - php
+    working_dir: /app
+    volumes:
+      - ./src:/app
+    networks:
+      - projectenv
